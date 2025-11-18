@@ -67,6 +67,9 @@ public class Productor {
                         } catch (RemoteException e) {
                             System.out.println("Error: No se pudo enviar el mensaje: " + e.getMessage());
                             break;
+                        } catch (Exception e) {
+                            System.out.println("Error inesperado: " + e.getMessage());
+                            break;
                         }
                     case "4":
                         try {

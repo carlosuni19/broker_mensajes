@@ -162,50 +162,51 @@ public class BrokerasincImpl extends UnicastRemoteObject implements Brokerasinc 
                 }
                 // Si hay consumidores registrados, vacia la cola.
                 if (!queue.getConsumidores().isEmpty()) {
-                    while (!queue.colaVacia()) {
+                    int trys = 0;
+                    while (!queue.colaVacia() && trys < 3) {
                         mensajeTemp = queue.consumirMensaje();
                         ConsumerCallback consumer = queue.getnextconsumer();
-                        int trys = 0;
                         try{
                             boolean ack = consumer.onMessage(mensajeTemp, this);
                             if (ack){
                                 System.out.println("ACK recibido");
+                                trys = 0;// reset contador de reintentos
                             }
                             else{
-                                if (trys < 3) {
                                     queue.addMensaje(mensajeTemp);
                                     System.out.println("Mensaje reenviado a la cola debido a falta de ACK");
                                     trys++;
-                                } else {
-                                    System.out.println("No se recibió ACK después de 3 intentos. Consumidor eliminado de la cola.");
-                                    queue.removeConsumer(consumer);
-                                    break;
-                                }
-                            }
+                                } 
+                            
                         } catch (RemoteException e) {
-                            queue.addMensaje(mensajeTemp);
-                            System.out.println("Error al enviar el mensaje al consumidor. Mensaje reenviado a la cola.");
+                            
+                                queue.addMensaje(mensajeTemp);
+                                trys++;
+                                System.out.println("Error al enviar el mensaje al consumidor. Mensaje reenviado a la cola.");
+                                
+                        }
+                        if (trys >= 3) {
+                            System.out.println("No se pudo entregar el mensaje tras 3 intentos. Consumidor elimando de la cola.");
+                            queue.removeConsumer(consumer);
+                            trys = 0;// reset contador de reintentos
                         }
                         // Si la cola es duradera, guardar el estado
-                    if (cola.startsWith(DUR_PREFIX)) {
-                        guardarEstado();
-                    }                   
+                        if (cola.startsWith(DUR_PREFIX)) {
+                            guardarEstado();
+                        }                   
                     }
                 }
                 else {
                     scheduler.schedule(() -> {
-                        while (!queue.colaVacia()) {
-                            if (queue.getConsumidores().isEmpty()) {
-                                queue.eliminarMensaje();
-                                System.out.println("No hay consumidores registrados en la cola '" + cola + "'. Mensaje eliminado por limite de tiempo.");
-                                break; // Salir si no hay consumidores registrados
-                            }
-                            // Si la cola es duradera, guardar el estado
+                        if (queue.getConsumidores().isEmpty()) {
+                            queue.eliminarMensaje();
+                            System.out.println("Mensaje '" + mensaje + "' eliminado por límite de tiempo.");
                             if (cola.startsWith(DUR_PREFIX)) {
                                 guardarEstado();
-                            }                   
+                            }
                         }
-                    }, 5, TimeUnit.MINUTES);
+                    }, 2, TimeUnit.MINUTES);
+
                 }
             } else {
                 System.out.println("La cola '" + cola + "' no existe. No se pudo publicar el mensaje.");
