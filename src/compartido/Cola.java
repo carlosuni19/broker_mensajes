@@ -53,11 +53,14 @@ public class Cola implements Serializable{
         return mensajes.isEmpty();
     }
 
+    public void removeConsumer(ConsumerCallback consumidor) {
+        consumidores.remove(consumidor);
+    }
+
     public String consumirMensaje() {
         if (mensajes.isEmpty()) {
             return null; // No hay mensajes
         }
-
         // Implementación de round-robin para seleccionar el siguiente consumidor
         if (nextConsumidor == null || !consumidores.contains(nextConsumidor)) {
             nextConsumidor = consumidores.get(0);
@@ -65,7 +68,6 @@ public class Cola implements Serializable{
             int currentIndex = consumidores.indexOf(nextConsumidor);
             nextConsumidor = consumidores.get((currentIndex + 1) % consumidores.size());
         }
-
         
         if (nextConsumidor != null) {
             return mensajes.poll();

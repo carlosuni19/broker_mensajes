@@ -127,7 +127,7 @@ public class BrokerasincImpl extends UnicastRemoteObject implements Brokerasinc 
             Cola queue = colas.get(nombreCola);
             //comprobar que el consumidor está registrado en la cola
             if (queue.getConsumidores().contains(consumidor)){
-                queue.getConsumidores().remove(consumidor);
+                queue.removeConsumer(consumidor);
                 respuesta = "Desuscripcion de la cola '" + nombreCola + "' realizada con exito.";
                 System.out.println("Consumidor desuscrito de la cola '" + nombreCola + "'.");
                 // Si la cola es duradera, guardar el estado
@@ -165,14 +165,22 @@ public class BrokerasincImpl extends UnicastRemoteObject implements Brokerasinc 
                     while (!queue.colaVacia()) {
                         mensajeTemp = queue.consumirMensaje();
                         ConsumerCallback consumer = queue.getnextconsumer();
+                        int trys = 0;
                         try{
                             boolean ack = consumer.onMessage(mensajeTemp, this);
                             if (ack){
                                 System.out.println("ACK recibido");
                             }
                             else{
-                                queue.addMensaje(mensajeTemp);
-                                System.out.println("Mensaje reenviado a la cola debido a falta de ACK");
+                                if (trys < 3) {
+                                    queue.addMensaje(mensajeTemp);
+                                    System.out.println("Mensaje reenviado a la cola debido a falta de ACK");
+                                    trys++;
+                                } else {
+                                    System.out.println("No se recibió ACK después de 3 intentos. Consumidor eliminado de la cola.");
+                                    queue.removeConsumer(consumer);
+                                    break;
+                                }
                             }
                         } catch (RemoteException e) {
                             queue.addMensaje(mensajeTemp);
@@ -189,6 +197,7 @@ public class BrokerasincImpl extends UnicastRemoteObject implements Brokerasinc 
                         while (!queue.colaVacia()) {
                             if (queue.getConsumidores().isEmpty()) {
                                 queue.eliminarMensaje();
+                                System.out.println("No hay consumidores registrados en la cola '" + cola + "'. Mensaje eliminado por limite de tiempo.");
                                 break; // Salir si no hay consumidores registrados
                             }
                             // Si la cola es duradera, guardar el estado
